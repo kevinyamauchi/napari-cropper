@@ -1,6 +1,6 @@
 import numpy as np
 import napari
-from napari.layers.shapes._shapes_utils import triangulate_face
+from napari.layers.shapes._shapes_utils import inside_triangles
 
 nz = 128
 ny = 128
@@ -19,50 +19,50 @@ face_normals = {
 face_coords = {
     'x_pos': np.array(
         [
-            [0, 0, nx],
-            [0, ny, nx],
+            [-0.5, -0.5, nx],
+            [-0.5, ny, nx],
             [nz, ny, nx],
-            [nz, 0, nx],
+            [nz, -0.5, nx],
         ]
     ),
     'x_neg': np.array(
         [
-            [0, 0, 0],
-            [0, ny, 0],
-            [nz, ny, 0],
-            [nz, 0, 0],
+            [-0.5, -0.5, -0.5],
+            [-0.5, ny, -0.5],
+            [nz, ny, -0.5],
+            [nz, -0.5, -0.5],
         ]
     ),
     'y_pos': np.array(
         [
-            [0, ny, 0],
-            [0, ny, nx],
+            [-0.5, ny, -0.5],
+            [-0.5, ny, nx],
             [nz, ny, nx],
-            [nz, ny, 0],
+            [nz, ny, -0.5],
         ]
     ),
     'y_neg': np.array(
         [
-            [0, 0, 0],
-            [0, 0, nx],
-            [nz, 0, nx],
-            [nz, 0, 0],
+            [-0.5, -0.5, -0.5],
+            [-0.5, -0.5, nx],
+            [nz, -0.5, nx],
+            [nz, -0.5, -0.5],
         ]
     ),
     'z_pos': np.array(
         [
-            [nz, 0, 0],
-            [nz, 0, nx],
+            [nz, -0.5, -0.5],
+            [nz, -0.5, nx],
             [nz, ny, nx],
-            [nz, ny, 0],
+            [nz, ny, -0.5],
         ]
     ),
     'z_neg': np.array(
         [
-            [0, 0, 0],
-            [0, 0, nx],
-            [0, ny, nx],
-            [0, ny, 0],
+            [-0.5, -0.5, -0.5],
+            [-0.5, -0.5, nx],
+            [-0.5, ny, nx],
+            [-0.5, ny, -0.5],
         ]
     )
 }
@@ -98,29 +98,41 @@ with napari.gui_qt():
         triangle_offset = 0
         for k, v in face_normals.items():
             if (np.dot(view_dir, v) + 0.001) < 0:
-                vertices = face_coords[k].tolist()
-                coords += vertices
-                print(k)
+                vertices = face_coords[k]
 
-                all_vertices += vertices
-                triangles = np.array([[0, 1, 2], [0, 2, 3]]) + triangle_offset
-                all_triangles += triangles.tolist()
-                triangle_offset += 4
+                tform = viewer.window.qt_viewer.layer_to_visual[viewer.layers[0]].node.get_transform(map_from='visual',
+                                                                                                     map_to='canvas')
+
+                # convert the vertex coordinates to canvas coordinates
+                vertices_canv = tform.map(np.asarray(vertices)[:, [2, 1, 0]])
+                vertices_canv = vertices_canv[:, :2] / vertices_canv[:, 3:]
+                triangle_vertices_canv = np.stack((vertices_canv[[0, 1, 2]], vertices_canv[[0, 2, 3]]))
+                click_pos_canv = event.pos
+                in_triangles = inside_triangles(triangle_vertices_canv - click_pos_canv)
+                if in_triangles.sum() > 0:
+                    coords += vertices.tolist()
+                    print(k)
+
+                    all_vertices += vertices.tolist()
+                    triangles = np.array([[0, 1, 2], [0, 2, 3]]) + triangle_offset
+                    all_triangles += triangles.tolist()
+                    triangle_offset += 4
 
         viewer.layers['points'].data = coords
 
-        viewer.layers['surface']._vertex_values = np.ones((len(all_vertices)))
-        viewer.layers['surface']._faces = np.asarray(all_triangles)
-        viewer.layers['surface'].vertices = np.asarray(all_vertices)
+        if len(all_vertices) > 0:
+            viewer.layers['surface']._vertex_values = np.ones((len(all_vertices)))
+            viewer.layers['surface']._faces = np.asarray(all_triangles)
+            viewer.layers['surface'].vertices = np.asarray(all_vertices)
 
-        # get the transform from the visual - this can probably come from the camera?
-        tform = viewer.window.qt_viewer.layer_to_visual[viewer.layers[0]].node.get_transform(map_from='visual', map_to='canvas')
-
-        # convert the vertex coordinates to canvas coordinates
-        coords_canv = tform.map(np.asarray(all_vertices)[:, [2, 1, 0]])
-        coords_canv = coords_canv[:, :2] / coords_canv[:, 3:]
-        print(coords_canv)
-        print(event.pos)
+            # # get the transform from the visual - this can probably come from the camera?
+            # tform = viewer.window.qt_viewer.layer_to_visual[viewer.layers[0]].node.get_transform(map_from='visual', map_to='canvas')
+            #
+            # # convert the vertex coordinates to canvas coordinates
+            # coords_canv = tform.map(np.asarray(all_vertices)[:, [2, 1, 0]])
+            # coords_canv = coords_canv[:, :2] / coords_canv[:, 3:]
+            # print(coords_canv)
+            # print(event.pos)
 
 
 
