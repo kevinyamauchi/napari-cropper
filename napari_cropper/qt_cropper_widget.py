@@ -1,4 +1,3 @@
-import napari
 import numpy as np
 from napari.layers.shapes._shapes_utils import inside_triangles
 from qtpy.QtCore import Qt
@@ -16,22 +15,22 @@ class QtCropperWidget(QWidget):
 
     Parameters
     ----------
-    viewer : napari.viewer.Viewer
+    napari_viewer : napari.viewer.Viewer
         The parent napari viewer
 
     Attributes
     ----------
     """
 
-    def __init__(self, viewer: napari.viewer.Viewer):
+    def __init__(self, napari_viewer):
         super().__init__()
-        self.viewer = viewer
+        self.viewer = napari_viewer
 
         # create the surface layer for
         vertices = np.array([[0, 0], [0, 20], [10, 0], [10, 10]])
         faces = np.array([[0, 1, 2], [1, 2, 3]])
         values = np.linspace(0, 1, len(vertices))
-        surface_layer = viewer.add_surface(
+        surface_layer = napari_viewer.add_surface(
             (vertices, faces, values), name="surface", opacity=0.5, colormap="bop blue"
         )
         surface_layer.mouse_drag_callbacks.append(self._on_click)
